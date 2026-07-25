@@ -1,2 +1,136 @@
-# KitchenApp
-Manage your pantry and shopping based on recipes you choose. 
+# Restock
+
+Kitchen inventory and grocery list, driven by browsing recipes.
+
+Inventory is never entered by hand as a chore. When you open a recipe you're
+already deciding "do I have this?" for each ingredient — the app captures that
+decision. Tapping **have it** confirms the item in your kitchen; tapping
+**need it** puts it on the grocery list.
+
+## The data model (read this before changing anything)
+
+Inventory is **not** quantity-tracked. Each item has:
+
+| field              | meaning                                                     |
+| ------------------ | ----------------------------------------------------------- |
+| `status`           | `full` \| `some` \| `none` — nothing else, no counts         |
+| `last_updated`     | when the user last set it — **display and sorting only**     |
+| `source`           | `recipe_checkout` \| `manual` \| `seed`                      |
+
+Two rules the code deliberately enforces:
+
+1. **No time-based decay.** A status set two years ago is still that status.
+   Nothing reads elapsed time to downgrade, expire, or second-guess a value.
+   `last_updated` exists so the user can judge staleness themselves.
+2. **The app never invents a status.** An item with no inventory row is
+   *untracked*, which is different from `none`. `none` is a statement the user
+   made; untracked means they never said.
+
+### Recipe → inventory pre-fill
+
+When a recipe opens, each ingredient is cross-referenced against inventory:
+
+| current status | pre-filled choice                                  |
+| -------------- | -------------------------------------------------- |
+| `full`         | have it                                            |
+| `some`         | have it (judgment call — one tap to override)      |
+| `none`         | need it                                            |
+| untracked      | need it (never claim they have something)          |
+
+Every pre-fill is a suggestion, overridable with a single tap.
+
+### What checkout writes
+
+- **have it** → inventory. Confirming does not inflate what the user already
+  said: an item marked `some` stays `some` and just gets a fresh timestamp.
+  Only `none`/untracked is promoted to `full`, because the tap directly
+  contradicts the old value.
+- **need it** → grocery list, with the recipe's quantity text.
+  It does **not** write inventory by default. "I need to buy this" is not the
+  same claim as "I have zero of it". The checkout screen exposes an explicit,
+  default-off toggle for users who want it to mean both.
+
+Quantities on the grocery list accumulate as text (`"2 cups; 1 tbsp"`) rather
+than being summed — units are free text and adding them would be a guess.
+
+## Project layout
+
+The data model is fully separated from the views so the two halves can be
+worked on independently.
+
+```
+src/
+  data/          # persistence — SQLite only, no React
+    types.ts        domain types + labels
+    db.ts           connection, schema, migrations
+    itemRepo.ts     canonical items + name normalization
+    inventoryRepo.ts
+    recipeRepo.ts
+    groceryRepo.ts
+    seed.ts         8 starter recipes, inserted once
+  logic/         # pure functions — no React, no SQLite
+    matching.ts     pre-fill rules, checkout plan, match summary
+    format.ts       relative dates, aisle grouping
+    rules.check.ts  assertions covering the rules above
+  state/
+    store.ts        Zustand; SQLite is the source of truth, this is a
+                    read-through cache that refreshes after every write
+  ui/
+    theme.ts
+    components/
+    screens/
+```
+
+`logic/` has no framework imports, which is what makes the spec's rules
+directly testable in plain Node.
+
+## Running it
+
+```bash
+npm install
+```
+
+```bash
+npm start
+```
+
+Day-to-day development happens in JS/TS with Metro. Xcode is only for build
+config, signing, and TestFlight/App Store submission:
+
+```bash
+open ios/Restock.xcworkspace
+```
+
+The `ios/` project is checked in. Regenerate it if native config changes:
+
+```bash
+npx expo prebuild --platform ios --clean
+```
+
+## Checks
+
+```bash
+npm run typecheck && npm run check:logic
+```
+
+`check:logic` runs `src/logic/rules.check.ts` under plain Node — it asserts the
+pre-fill table, that `some` survives confirmation, that need-it doesn't silently
+write inventory, and that a years-old status still counts as on hand.
+
+## Known environment issues on this machine
+
+- **Xcode is not installed** (only Command Line Tools), so the app has not been
+  run in a simulator yet. Install Xcode, then:
+  `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+- **`LANG` is unset**, which makes CocoaPods crash with
+  `Unicode Normalization not appropriate for ASCII-8BIT`. Add
+  `export LANG=en_US.UTF-8` to your shell profile, or prefix:
+  `LANG=en_US.UTF-8 pod install`
+- **Node is 20.11.0**; Expo SDK 57 wants `>=20.19.4`. It bundles fine but the
+  version warning will keep appearing.
+
+## Out of scope for this MVP
+
+No auth, no accounts, no cloud sync, no backend. No AI/budgeting features, no
+store pricing or brand comparison, no barcode scanning or receipt OCR, no
+ingredient health scanning. Single local user, single device.
