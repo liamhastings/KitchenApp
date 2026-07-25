@@ -119,9 +119,10 @@ write inventory, and that a years-old status still counts as on hand.
 
 ## Known environment issues on this machine
 
-- **Xcode is not installed** (only Command Line Tools), so the app has not been
-  run in a simulator yet. Install Xcode, then:
-  `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+- **Xcode 26.0.1** (Swift 6.2) is below Expo SDK 57's recommended **Xcode
+  26.4+** (Swift 6.3). A `patch-package` workaround in `patches/` fixes
+  `expo-modules-jsi` compile errors on this toolchain; upgrading Xcode removes
+  the need for it.
 - **`LANG` is unset**, which makes CocoaPods crash with
   `Unicode Normalization not appropriate for ASCII-8BIT`. Add
   `export LANG=en_US.UTF-8` to your shell profile, or prefix:
