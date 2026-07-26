@@ -22,6 +22,11 @@ export function relativeDate(iso: string | null): string {
   return `${Math.floor(days / 30)} months ago`;
 }
 
+/** "$12.40". Plain arithmetic formatting — no locale/currency negotiation. */
+export function formatCad(amount: number): string {
+  return `$${amount.toFixed(2)}`;
+}
+
 /** Groups any item-bearing row by store section, in aisle order. */
 export function groupBySection<T>(
   rows: T[],

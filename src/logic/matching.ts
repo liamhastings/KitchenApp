@@ -83,6 +83,24 @@ export function statusAfterHave(current: ItemStatus | null): ItemStatus {
   return 'full';
 }
 
+/**
+ * The inventory writes for putting shopping away.
+ *
+ * Deliberately asymmetric with `statusAfterHave`. Confirming "have it" on a
+ * recipe must not inflate a `some` into a `full` — the user is affirming a
+ * belief they already held. Buying is different: a purchase genuinely adds
+ * stock, so it lands at `full` no matter what was there before.
+ *
+ * This is the one place the app writes inventory from the grocery list, and it
+ * only ever runs when the user explicitly asks for it. Ticking an item in the
+ * cart is reversible; putting it away is the deliberate, one-way step.
+ */
+export function buildPutAwayPlan(
+  items: Array<{ itemId: string }>
+): Array<{ itemId: string; status: ItemStatus }> {
+  return items.map((item) => ({ itemId: item.itemId, status: 'full' }));
+}
+
 export interface CheckoutPlan {
   /** Inventory writes from "have it" ingredients. */
   inventoryUpdates: Array<{ itemId: string; status: ItemStatus }>;
@@ -152,6 +170,51 @@ export function computeMatchForItems(
   }
 
   return { total: itemIds.length, onHand, missing, unknown };
+}
+
+export interface CookableRecipe<T> {
+  recipe: T;
+  match: RecipeMatch;
+  /** Ingredients not confirmed on hand: `none` plus never-recorded. */
+  gaps: number;
+}
+
+/**
+ * Splits recipes into what the kitchen can cook right now and what it nearly
+ * can.
+ *
+ * `ready` requires **every** ingredient to be `full` or `some`. An untracked
+ * ingredient is never counted as on hand — the app has no idea whether the user
+ * owns it, and promising a meal it can't back up would be the one thing this
+ * data model refuses to do. That's also why untracked ingredients hold a recipe
+ * back into `nearly` rather than out of the list entirely: the user may well
+ * have them, they just haven't said.
+ *
+ * `nearly` is capped at `maxGaps` so it stays a short, useful list rather than
+ * every recipe the user has never touched.
+ */
+export function splitCookable<T>(
+  recipes: Array<{ recipe: T; itemIds: string[] }>,
+  statusMap: Map<string, InventoryEntry>,
+  maxGaps = 3
+): { ready: Array<CookableRecipe<T>>; nearly: Array<CookableRecipe<T>> } {
+  const ready: Array<CookableRecipe<T>> = [];
+  const nearly: Array<CookableRecipe<T>> = [];
+
+  for (const { recipe, itemIds } of recipes) {
+    if (itemIds.length === 0) continue;
+
+    const match = computeMatchForItems(itemIds, statusMap);
+    const gaps = match.total - match.onHand;
+    const entry = { recipe, match, gaps };
+
+    if (gaps === 0) ready.push(entry);
+    // Nothing on hand at all isn't "nearly" anything — it's just a recipe.
+    else if (gaps <= maxGaps && match.onHand > 0) nearly.push(entry);
+  }
+
+  nearly.sort((a, b) => a.gaps - b.gaps);
+  return { ready, nearly };
 }
 
 export function computeRecipeMatch(

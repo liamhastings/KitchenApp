@@ -9,8 +9,8 @@ import type { Recipe } from '../../data/types';
 import { computeMatchForItems, type RecipeMatch } from '../../logic/matching';
 import type { RootStackParamList } from '../../navigation/types';
 import { useAppStore } from '../../state/store';
-import { Button, EmptyState } from '../components/common';
-import { colors, radius, spacing } from '../theme';
+import { Button, EmptyState, ScreenHeader } from '../components/common';
+import { colors, fonts, hairline, radius, spacing, type } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -34,22 +34,20 @@ export function RecipesScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Recipes</Text>
-          <Text style={styles.subtitle}>
-            Open one and mark what you have — your inventory and list update from that.
-          </Text>
-        </View>
-      </View>
+      <ScreenHeader
+        eyebrow="Your kitchen"
+        title="Recipes"
+        subtitle="Open one and mark what you have — your kitchen and list update from that."
+      />
 
       <FlatList
         data={recipes}
         keyExtractor={(r) => r.id}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <Button
-            title="+ Add your own recipe"
+            title="Add your own recipe"
             variant="secondary"
             onPress={() => navigation.navigate('AddRecipe')}
             style={styles.addButton}
@@ -82,6 +80,8 @@ function RecipeCard({
   match: RecipeMatch | undefined;
   onPress: () => void;
 }) {
+  const hasMatch = match && match.total > 0;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -98,64 +98,81 @@ function RecipeCard({
         </Text>
       )}
 
+      {hasMatch && <MatchBar match={match} />}
+
       <View style={styles.cardMeta}>
-        {!!recipe.servings && <Text style={styles.metaText}>Serves {recipe.servings}</Text>}
-        {match && match.total > 0 && (
-          <Text style={styles.metaText}>
-            {match.onHand} of {match.total} on hand
-            {match.unknown > 0 ? ` · ${match.unknown} unknown` : ''}
+        {hasMatch && (
+          <Text style={styles.metaCount}>
+            <Text style={styles.metaCountStrong}>{match.onHand}</Text> of {match.total} on hand
           </Text>
         )}
+        {hasMatch && match.unknown > 0 && (
+          <Text style={styles.metaText}>{match.unknown} unknown</Text>
+        )}
+        {!!recipe.servings && <Text style={styles.metaText}>Serves {recipe.servings}</Text>}
       </View>
-
-      {match && match.total > 0 && <MatchBar match={match} />}
     </Pressable>
   );
 }
 
-/** Three-segment bar: on hand / missing / never recorded. */
+/** Three-segment hairline bar: on hand / missing / never recorded. */
 function MatchBar({ match }: { match: RecipeMatch }) {
   return (
     <View style={styles.bar}>
       <View style={[styles.barFill, { flex: match.onHand, backgroundColor: colors.accent }]} />
-      <View style={[styles.barFill, { flex: match.missing, backgroundColor: colors.danger }]} />
-      <View style={[styles.barFill, { flex: match.unknown, backgroundColor: colors.border }]} />
+      <View style={[styles.barFill, { flex: match.missing, backgroundColor: colors.clay }]} />
+      <View
+        style={[styles.barFill, { flex: match.unknown, backgroundColor: colors.borderStrong }]}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  headerText: { gap: spacing.xs },
-  title: { fontSize: 30, fontWeight: '800', color: colors.text },
-  subtitle: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
-  listContent: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
-  addButton: { marginBottom: spacing.xs },
+  listContent: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
+  addButton: { marginBottom: spacing.sm },
   card: {
     backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: hairline,
     borderColor: colors.border,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg + 2,
+    gap: spacing.md,
+  },
+  pressed: { opacity: 0.65 },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  pressed: { opacity: 0.7 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: colors.text, flexShrink: 1 },
+  cardTitle: { ...type.title, flexShrink: 1 },
   yoursBadge: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...type.eyebrow,
     color: colors.accent,
     backgroundColor: colors.accentSoft,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
     borderRadius: radius.pill,
     overflow: 'hidden',
   },
-  cardDescription: { fontSize: 14, color: colors.textMuted, lineHeight: 19 },
-  cardMeta: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },
-  metaText: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
-  bar: { flexDirection: 'row', height: 5, borderRadius: radius.pill, overflow: 'hidden' },
-  barFill: { height: 5 },
+  cardDescription: { ...type.bodySoft, marginTop: -spacing.xs },
+  cardMeta: { flexDirection: 'row', gap: spacing.lg, flexWrap: 'wrap' },
+  metaCount: type.meta,
+  metaCountStrong: { fontFamily: fonts.semibold, color: colors.ink },
+  metaText: type.meta,
+  bar: {
+    flexDirection: 'row',
+    height: 3,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    backgroundColor: colors.linen,
+  },
+  barFill: { height: 3 },
 });

@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { IngredientChoice } from '../../data/types';
-import { colors, radius, spacing } from '../theme';
+import { colors, fonts, hairline, radius, spacing } from '../theme';
 
 interface Props {
   value: IngredientChoice;
@@ -12,22 +12,23 @@ interface Props {
  * The core interaction of the app: one tap to flip an ingredient between
  * "have it" and "need it". Both options are always visible so overriding a
  * pre-filled suggestion never costs more than a single tap.
+ *
+ * Rendered as one segmented control on a linen well so the pair reads as a
+ * single choice rather than two competing buttons.
  */
 export function HaveNeedToggle({ value, onChange }: Props) {
   return (
-    <View style={styles.row}>
+    <View style={styles.track}>
       <Option
         label="Have it"
         active={value === 'have'}
         activeFg={colors.accent}
-        activeBg={colors.accentSoft}
         onPress={() => onChange('have')}
       />
       <Option
         label="Need it"
         active={value === 'need'}
-        activeFg={colors.danger}
-        activeBg={colors.dangerSoft}
+        activeFg={colors.clay}
         onPress={() => onChange('need')}
       />
     </View>
@@ -38,11 +39,10 @@ interface OptionProps {
   label: string;
   active: boolean;
   activeFg: string;
-  activeBg: string;
   onPress: () => void;
 }
 
-function Option({ label, active, activeFg, activeBg, onPress }: OptionProps) {
+function Option({ label, active, activeFg, onPress }: OptionProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -51,13 +51,11 @@ function Option({ label, active, activeFg, activeBg, onPress }: OptionProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.option,
-        active
-          ? { backgroundColor: activeBg, borderColor: activeFg }
-          : { backgroundColor: colors.card, borderColor: colors.border },
+        active && { backgroundColor: colors.card, borderColor: activeFg },
         pressed && styles.pressed,
       ]}>
       <Text
-        style={[styles.label, { color: active ? activeFg : colors.textMuted }]}
+        style={[styles.label, { color: active ? activeFg : colors.inkMuted }]}
         numberOfLines={1}>
         {label}
       </Text>
@@ -66,23 +64,27 @@ function Option({ label, active, activeFg, activeBg, onPress }: OptionProps) {
 }
 
 const styles = StyleSheet.create({
-  row: {
+  track: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.xs,
+    padding: spacing.xs,
+    backgroundColor: colors.linen,
+    borderRadius: radius.pill,
+    alignSelf: 'flex-start',
   },
   option: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg + 2,
+    paddingVertical: spacing.sm + 1,
     borderRadius: radius.pill,
-    borderWidth: 1.5,
-    minWidth: 92,
+    borderWidth: hairline,
+    borderColor: 'transparent',
+    minWidth: 96,
     alignItems: 'center',
   },
-  pressed: {
-    opacity: 0.7,
-  },
+  pressed: { opacity: 0.6 },
   label: {
+    fontFamily: fonts.medium,
     fontSize: 14,
-    fontWeight: '700',
+    letterSpacing: 0.1,
   },
 });

@@ -11,7 +11,7 @@
 export type ItemStatus = 'full' | 'some' | 'none';
 
 /** How an inventory status was last set. Display/debug only. */
-export type StatusSource = 'recipe_checkout' | 'manual' | 'seed';
+export type StatusSource = 'recipe_checkout' | 'grocery_checkout' | 'manual' | 'seed';
 
 /** Aisle grouping used to organize the grocery list. */
 export type StoreSection =

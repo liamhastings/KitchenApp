@@ -16,7 +16,7 @@ import type {
   StatusSource,
   StoreSection,
 } from '../data/types';
-import type { CheckoutPlan } from '../logic/matching';
+import { buildPutAwayPlan, type CheckoutPlan } from '../logic/matching';
 
 /**
  * Single store for the whole app. SQLite is the source of truth; this holds a
@@ -47,6 +47,13 @@ interface AppState {
 
   /** Applies a checkout: inventory writes and grocery additions, together. */
   applyCheckout: (plan: CheckoutPlan, recipeTitle: string) => void;
+
+  /**
+   * Moves everything ticked off in the cart into the kitchen as `full`, then
+   * drops those rows from the list. One explicit step, because ticking an item
+   * is reversible and this is not.
+   */
+  putCheckedInKitchen: () => void;
 
   toggleGroceryChecked: (entryId: string, checked: boolean) => void;
   removeGroceryEntry: (entryId: string) => void;
@@ -83,9 +90,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshRecipes: () => set({ recipes: recipeRepo.listRecipes() }),
 
   refreshInventory: () => {
-    // Includes untracked items so the Inventory screen can offer them for a
-    // first-time status set.
-    const rows = inventoryRepo.listAllItemsWithStatus();
+    // Tracked items only. Inventory is something the user builds deliberately,
+    // so it starts empty rather than pre-listing every ingredient the seeded
+    // recipes happen to mention. Untracked items are simply absent from
+    // `statusMap`, which is exactly what the pre-fill rules expect.
+    const rows = inventoryRepo.listInventory();
     set({ inventory: rows, statusMap: buildStatusMap(rows) });
   },
 
@@ -125,6 +134,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   applyCheckout: (plan, recipeTitle) => {
     inventoryRepo.setStatusBulk(plan.inventoryUpdates, 'recipe_checkout');
     groceryRepo.addToGroceryBulk(plan.groceryAdditions, recipeTitle);
+    get().refreshInventory();
+    get().refreshGrocery();
+  },
+
+  putCheckedInKitchen: () => {
+    const checked = get().grocery.filter((row) => row.entry.checked);
+    if (checked.length === 0) return;
+
+    const plan = buildPutAwayPlan(checked.map((row) => ({ itemId: row.item.id })));
+
+    inventoryRepo.setStatusBulk(plan, 'grocery_checkout');
+    groceryRepo.clearChecked();
     get().refreshInventory();
     get().refreshGrocery();
   },

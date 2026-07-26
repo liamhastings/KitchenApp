@@ -16,7 +16,7 @@ import { SECTION_LABELS, STORE_SECTIONS, type StoreSection } from '../../data/ty
 import type { RootStackScreenProps } from '../../navigation/types';
 import { useAppStore } from '../../state/store';
 import { Button } from '../components/common';
-import { colors, radius, spacing } from '../theme';
+import { colors, fonts, hairline, radius, spacing, type } from '../theme';
 
 interface DraftIngredient {
   key: string;
@@ -98,12 +98,13 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
         <ScrollView
           contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
           <Field label="Title">
             <TextInput
-              style={styles.input}
+              style={[styles.input, styles.titleInput]}
               placeholder="Sunday chili"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.inkMuted}
               value={title}
               onChangeText={setTitle}
             />
@@ -113,7 +114,7 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
             <TextInput
               style={[styles.input, styles.multiline]}
               placeholder="What makes it worth cooking?"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.inkMuted}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -124,13 +125,16 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
             <TextInput
               style={styles.input}
               placeholder="4"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.inkMuted}
               value={servings}
               onChangeText={setServings}
             />
           </Field>
 
-          <Text style={styles.groupLabel}>INGREDIENTS</Text>
+          <View style={styles.groupHeader}>
+            <Text style={styles.eyebrow}>Ingredients</Text>
+            <View style={styles.rule} />
+          </View>
 
           {ingredients.map((ing, index) => (
             <View key={ing.key} style={styles.ingredientCard}>
@@ -147,14 +151,14 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
                 <TextInput
                   style={[styles.input, styles.flex]}
                   placeholder="Ingredient"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.inkMuted}
                   value={ing.name}
                   onChangeText={(text) => updateIngredient(ing.key, { name: text })}
                 />
                 <TextInput
                   style={[styles.input, styles.quantityInput]}
                   placeholder="Qty"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.inkMuted}
                   value={ing.quantity}
                   onChangeText={(text) => updateIngredient(ing.key, { quantity: text })}
                 />
@@ -165,15 +169,13 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
                 accessibilityLabel={`Store section: ${SECTION_LABELS[ing.section]}. Tap to change.`}
                 onPress={() => cycleSection(ing.key, ing.section)}
                 style={({ pressed }) => [styles.sectionChip, pressed && styles.pressed]}>
-                <Text style={styles.sectionChipText}>
-                  {SECTION_LABELS[ing.section]} ▸
-                </Text>
+                <Text style={styles.sectionChipText}>{SECTION_LABELS[ing.section]} ›</Text>
               </Pressable>
             </View>
           ))}
 
           <Button
-            title="+ Add ingredient"
+            title="Add ingredient"
             variant="secondary"
             onPress={() => setIngredients((prev) => [...prev, blankIngredient()])}
           />
@@ -199,58 +201,64 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
-  field: { gap: spacing.xs },
-  fieldLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+  field: { gap: spacing.sm },
+  fieldLabel: type.eyebrow,
   input: {
+    ...type.body,
     backgroundColor: colors.card,
-    borderWidth: 1,
+    borderWidth: hairline,
     borderColor: colors.border,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    fontSize: 15,
-    color: colors.text,
+    paddingVertical: spacing.md,
   },
-  multiline: { minHeight: 72, textAlignVertical: 'top' },
-  groupLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    color: colors.textMuted,
+  /** The recipe name is the one field set in the display serif. */
+  titleInput: { ...type.title, paddingVertical: spacing.md },
+  multiline: { minHeight: 84, textAlignVertical: 'top' },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     marginTop: spacing.sm,
   },
+  eyebrow: type.eyebrow,
+  rule: { flex: 1, height: hairline, backgroundColor: colors.border },
   ingredientCard: {
     backgroundColor: colors.card,
-    borderWidth: 1,
+    borderWidth: hairline,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing.md,
-    gap: spacing.sm,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   ingredientHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  ingredientIndex: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  removeText: { fontSize: 12, fontWeight: '700', color: colors.danger },
+  ingredientIndex: { fontFamily: fonts.display, fontSize: 20, color: colors.inkMuted },
+  removeText: { fontFamily: fonts.medium, fontSize: 12, color: colors.clay },
   ingredientInputs: { flexDirection: 'row', gap: spacing.sm },
-  quantityInput: { width: 80 },
+  quantityInput: { width: 78 },
   sectionChip: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: spacing.xs + 3,
     borderRadius: radius.pill,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.linen,
   },
-  sectionChipText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  pressed: { opacity: 0.7 },
+  sectionChipText: { fontFamily: fonts.medium, fontSize: 12, color: colors.inkSoft },
+  pressed: { opacity: 0.65 },
   footer: {
-    padding: spacing.lg,
-    borderTopWidth: 1,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderTopWidth: hairline,
     borderTopColor: colors.border,
     backgroundColor: colors.card,
   },

@@ -6,9 +6,9 @@ import { STATUS_LABELS } from '../../data/types';
 import { buildCheckoutPlan, statusAfterHave } from '../../logic/matching';
 import type { RootStackScreenProps } from '../../navigation/types';
 import { useAppStore } from '../../state/store';
-import { Button } from '../components/common';
+import { Button, Divider } from '../components/common';
 import { StatusPill } from '../components/StatusPill';
-import { colors, radius, spacing } from '../theme';
+import { colors, fonts, hairline, radius, spacing, type } from '../theme';
 
 export function CheckoutScreen({ route, navigation }: RootStackScreenProps<'Checkout'>) {
   const { recipeId, lines } = route.params;
@@ -34,30 +34,30 @@ export function CheckoutScreen({ route, navigation }: RootStackScreenProps<'Chec
 
   return (
     <SafeAreaView style={styles.screen} edges={['left', 'right', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.lead}>
-          {recipe ? `From ${recipe.title}` : 'Review your changes'}
-        </Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.intro}>
+          <Text style={styles.eyebrow}>{recipe ? recipe.title : 'Review'}</Text>
+          <Text style={styles.introTitle}>Here's what changes</Text>
+        </View>
 
         <View style={styles.group}>
-          <Text style={styles.groupTitle}>
-            Confirming in your kitchen ({haveLines.length})
-          </Text>
+          <View style={styles.groupHead}>
+            <Text style={styles.groupTitle}>Confirming in your kitchen</Text>
+            <Text style={styles.groupCount}>{haveLines.length}</Text>
+          </View>
+          <Divider />
+
           {haveLines.length === 0 ? (
             <Text style={styles.groupEmpty}>Nothing marked "have it".</Text>
           ) : (
-            haveLines.map((line) => {
-              const next = statusAfterHave(line.status);
-              return (
-                <View key={line.itemId} style={styles.row}>
-                  <Text style={styles.rowName}>{line.itemName}</Text>
-                  <View style={styles.rowRight}>
-                    <StatusPill status={next} small />
-                  </View>
-                </View>
-              );
-            })
+            haveLines.map((line) => (
+              <View key={line.itemId} style={styles.row}>
+                <Text style={styles.rowName}>{line.itemName}</Text>
+                <StatusPill status={statusAfterHave(line.status)} small />
+              </View>
+            ))
           )}
+
           {haveLines.some((l) => l.status === 'some') && (
             <Text style={styles.note}>
               Items you'd marked "{STATUS_LABELS.some}" stay that way — confirming just
@@ -67,7 +67,12 @@ export function CheckoutScreen({ route, navigation }: RootStackScreenProps<'Chec
         </View>
 
         <View style={styles.group}>
-          <Text style={styles.groupTitle}>Adding to grocery list ({needLines.length})</Text>
+          <View style={styles.groupHead}>
+            <Text style={styles.groupTitle}>Adding to grocery list</Text>
+            <Text style={styles.groupCount}>{needLines.length}</Text>
+          </View>
+          <Divider />
+
           {needLines.length === 0 ? (
             <Text style={styles.groupEmpty}>Nothing marked "need it".</Text>
           ) : (
@@ -107,44 +112,63 @@ export function CheckoutScreen({ route, navigation }: RootStackScreenProps<'Chec
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xl },
-  lead: { fontSize: 14, color: colors.textMuted, fontWeight: '600' },
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+  intro: { gap: spacing.sm, paddingTop: spacing.xs, paddingBottom: spacing.xs },
+  eyebrow: type.eyebrow,
+  introTitle: type.display,
   group: {
     backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: hairline,
     borderColor: colors.border,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    gap: spacing.md,
+  },
+  groupHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  groupTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  groupEmpty: { fontSize: 14, color: colors.textMuted },
+  groupTitle: { ...type.subtitle, flexShrink: 1 },
+  groupCount: { fontFamily: fonts.display, fontSize: 24, color: colors.inkMuted },
+  groupEmpty: type.bodySoft,
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
-  rowName: { fontSize: 15, color: colors.text, flexShrink: 1 },
-  rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowQuantity: { fontSize: 13, color: colors.textMuted },
-  note: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginTop: spacing.xs },
+  rowName: { ...type.label, flexShrink: 1 },
+  rowQuantity: type.meta,
+  note: {
+    ...type.meta,
+    lineHeight: 18,
+    backgroundColor: colors.linen,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+  },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: hairline,
     borderTopColor: colors.border,
   },
-  switchText: { flex: 1, gap: 2 },
-  switchLabel: { fontSize: 14, fontWeight: '600', color: colors.text },
-  switchHint: { fontSize: 12, color: colors.textMuted, lineHeight: 16 },
+  switchText: { flex: 1, gap: 3 },
+  switchLabel: type.label,
+  switchHint: { ...type.meta, lineHeight: 17 },
   footer: {
-    padding: spacing.lg,
-    borderTopWidth: 1,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderTopWidth: hairline,
     borderTopColor: colors.border,
     backgroundColor: colors.card,
   },

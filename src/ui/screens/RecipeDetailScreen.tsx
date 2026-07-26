@@ -10,7 +10,7 @@ import { useAppStore } from '../../state/store';
 import { Button } from '../components/common';
 import { HaveNeedToggle } from '../components/HaveNeedToggle';
 import { StatusPill } from '../components/StatusPill';
-import { colors, radius, spacing } from '../theme';
+import { colors, fonts, hairline, radius, spacing, type } from '../theme';
 
 export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'RecipeDetail'>) {
   const { recipeId } = route.params;
@@ -26,9 +26,11 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
     recipe ? buildIngredientLines(recipe, statusMap) : []
   );
 
+  // The title is set large in the body instead, so the nav bar stays a bare
+  // back button and the page reads as a spread rather than a form.
   useLayoutEffect(() => {
-    navigation.setOptions({ title: recipe?.title ?? 'Recipe' });
-  }, [navigation, recipe?.title]);
+    navigation.setOptions({ title: '' });
+  }, [navigation]);
 
   if (!recipe) {
     return (
@@ -69,24 +71,29 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
 
   return (
     <SafeAreaView style={styles.screen} edges={['left', 'right', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {!!recipe.description && <Text style={styles.description}>{recipe.description}</Text>}
-
-        <View style={styles.metaRow}>
-          {!!recipe.servings && <Text style={styles.meta}>Serves {recipe.servings}</Text>}
-          <Text style={styles.meta}>
-            {lines.length} ingredient{lines.length === 1 ? '' : 's'}
-          </Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.intro}>
+          <Text style={styles.recipeTitle}>{recipe.title}</Text>
+          {!!recipe.description && <Text style={styles.description}>{recipe.description}</Text>}
+          <View style={styles.metaRow}>
+            {!!recipe.servings && <Text style={styles.meta}>Serves {recipe.servings}</Text>}
+            <Text style={styles.meta}>
+              {lines.length} ingredient{lines.length === 1 ? '' : 's'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.bulkRow}>
-          <Text style={styles.bulkLabel}>Mark all</Text>
-          <Pressable onPress={() => setAll('have')} hitSlop={8}>
-            <Text style={[styles.bulkAction, { color: colors.accent }]}>Have it</Text>
-          </Pressable>
-          <Pressable onPress={() => setAll('need')} hitSlop={8}>
-            <Text style={[styles.bulkAction, { color: colors.danger }]}>Need it</Text>
-          </Pressable>
+          <Text style={styles.eyebrow}>Ingredients</Text>
+          <View style={styles.bulkActions}>
+            <Text style={styles.bulkLabel}>Mark all</Text>
+            <Pressable onPress={() => setAll('have')} hitSlop={8}>
+              <Text style={[styles.bulkAction, { color: colors.accent }]}>Have</Text>
+            </Pressable>
+            <Pressable onPress={() => setAll('need')} hitSlop={8}>
+              <Text style={[styles.bulkAction, { color: colors.clay }]}>Need</Text>
+            </Pressable>
+          </View>
         </View>
 
         {lines.map((line) => (
@@ -120,7 +127,8 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
 
       <View style={styles.footer}>
         <Text style={styles.footerSummary}>
-          {haveCount} have · {needCount} need
+          <Text style={styles.footerCount}>{haveCount}</Text> have ·{' '}
+          <Text style={styles.footerCount}>{needCount}</Text> need
         </Text>
         <Button
           title="Review & finish"
@@ -134,43 +142,56 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
-  missing: { padding: spacing.xl, textAlign: 'center', color: colors.textMuted },
-  description: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
-  metaRow: { flexDirection: 'row', gap: spacing.lg },
-  meta: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  bulkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  bulkLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
-  bulkAction: { fontSize: 13, fontWeight: '700' },
-  ingredientCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.sm,
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
   },
-  ingredientTop: {
+  missing: { ...type.bodySoft, padding: spacing.xl, textAlign: 'center' },
+  intro: { gap: spacing.sm, paddingTop: spacing.xs },
+  recipeTitle: type.display,
+  description: { ...type.bodySoft, maxWidth: 440 },
+  metaRow: { flexDirection: 'row', gap: spacing.lg, paddingTop: spacing.xs },
+  meta: type.meta,
+  bulkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
+    gap: spacing.md,
+  },
+  eyebrow: type.eyebrow,
+  bulkActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  bulkLabel: type.meta,
+  bulkAction: { fontFamily: fonts.medium, fontSize: 13, letterSpacing: 0.1 },
+  ingredientCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: hairline,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  ingredientTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  ingredientNames: { flexShrink: 1, gap: 2 },
-  ingredientName: { fontSize: 17, fontWeight: '700', color: colors.text },
-  quantity: { fontSize: 13, color: colors.textMuted },
-  lastUpdated: { fontSize: 12, color: colors.textMuted },
+  ingredientNames: { flexShrink: 1, gap: 3 },
+  ingredientName: type.subtitle,
+  quantity: type.meta,
+  lastUpdated: { ...type.meta, marginTop: -spacing.sm },
   footer: {
-    padding: spacing.lg,
-    gap: spacing.sm,
-    borderTopWidth: 1,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    gap: spacing.md,
+    borderTopWidth: hairline,
     borderTopColor: colors.border,
     backgroundColor: colors.card,
   },
-  footerSummary: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
+  footerSummary: { ...type.meta, textAlign: 'center' },
+  footerCount: { fontFamily: fonts.semibold, color: colors.ink },
 });
