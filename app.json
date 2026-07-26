@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.liamhastings.restock"
+      "bundleIdentifier": "com.kailen.restock"
     },
     "android": {
       "package": "com.liamhastings.restock",
