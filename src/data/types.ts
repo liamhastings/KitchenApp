@@ -49,6 +49,75 @@ export const SECTION_LABELS: Record<StoreSection, string> = {
   other: 'Other',
 };
 
+/**
+ * Units offered when writing a recipe quantity. Stored quantities stay free
+ * text — this list only helps the user compose one without typing it out.
+ * `''` means a bare count ("3 eggs").
+ */
+export type QuantityUnit =
+  | ''
+  | 'g'
+  | 'kg'
+  | 'oz'
+  | 'lb'
+  | 'ml'
+  | 'l'
+  | 'tsp'
+  | 'tbsp'
+  | 'cup'
+  | 'clove'
+  | 'can'
+  | 'pkg';
+
+export const QUANTITY_UNITS: QuantityUnit[] = [
+  '',
+  'g',
+  'kg',
+  'oz',
+  'lb',
+  'ml',
+  'l',
+  'tsp',
+  'tbsp',
+  'cup',
+  'clove',
+  'can',
+  'pkg',
+];
+
+export const UNIT_LABELS: Record<QuantityUnit, string> = {
+  '': 'No unit',
+  g: 'Grams (g)',
+  kg: 'Kilograms (kg)',
+  oz: 'Ounces (oz)',
+  lb: 'Pounds (lb)',
+  ml: 'Millilitres (ml)',
+  l: 'Litres (l)',
+  tsp: 'Teaspoons (tsp)',
+  tbsp: 'Tablespoons (tbsp)',
+  cup: 'Cups',
+  clove: 'Cloves',
+  can: 'Cans',
+  pkg: 'Packages',
+};
+
+/** Short form shown on the picker itself, where space is tight. */
+export const UNIT_SHORT_LABELS: Record<QuantityUnit, string> = {
+  '': 'unit',
+  g: 'g',
+  kg: 'kg',
+  oz: 'oz',
+  lb: 'lb',
+  ml: 'ml',
+  l: 'l',
+  tsp: 'tsp',
+  tbsp: 'tbsp',
+  cup: 'cup',
+  clove: 'clove',
+  can: 'can',
+  pkg: 'pkg',
+};
+
 export const STATUS_LABELS: Record<ItemStatus, string> = {
   full: 'Full',
   some: 'Some',

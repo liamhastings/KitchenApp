@@ -1,4 +1,20 @@
-import { SECTION_LABELS, type StoreSection, STORE_SECTIONS } from '../data/types';
+import {
+  SECTION_LABELS,
+  type QuantityUnit,
+  type StoreSection,
+  STORE_SECTIONS,
+} from '../data/types';
+
+/**
+ * Joins an amount and a unit into the free-text quantity the rest of the app
+ * stores and displays, e.g. ("2", "lb") -> "2 lb". A unit with no amount is
+ * meaningless on a grocery list, so it is dropped.
+ */
+export function composeQuantity(amount: string, unit: QuantityUnit): string {
+  const cleanAmount = amount.trim();
+  if (!cleanAmount) return '';
+  return unit ? `${cleanAmount} ${unit}` : cleanAmount;
+}
 
 /**
  * "Updated today" / "3 days ago" — shown for reference only. Nothing in the app

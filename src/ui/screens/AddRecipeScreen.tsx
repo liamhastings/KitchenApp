@@ -12,23 +12,45 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { SECTION_LABELS, STORE_SECTIONS, type StoreSection } from '../../data/types';
+import {
+  QUANTITY_UNITS,
+  type QuantityUnit,
+  SECTION_LABELS,
+  STORE_SECTIONS,
+  type StoreSection,
+  UNIT_LABELS,
+  UNIT_SHORT_LABELS,
+} from '../../data/types';
+import { composeQuantity } from '../../logic/format';
 import type { RootStackScreenProps } from '../../navigation/types';
 import { useAppStore } from '../../state/store';
 import { Button } from '../components/common';
+import { Select, type SelectOption } from '../components/Select';
 import { colors, radius, spacing } from '../theme';
 
 interface DraftIngredient {
   key: string;
   name: string;
-  quantity: string;
+  /** Just the number — the unit is picked separately and joined on save. */
+  amount: string;
+  unit: QuantityUnit;
   section: StoreSection;
 }
+
+const SECTION_OPTIONS: Array<SelectOption<StoreSection>> = STORE_SECTIONS.map((section) => ({
+  value: section,
+  label: SECTION_LABELS[section],
+}));
+
+const UNIT_OPTIONS: Array<SelectOption<QuantityUnit>> = QUANTITY_UNITS.map((unit) => ({
+  value: unit,
+  label: UNIT_LABELS[unit],
+}));
 
 let nextKey = 0;
 function blankIngredient(): DraftIngredient {
   nextKey += 1;
-  return { key: `draft_${nextKey}`, name: '', quantity: '', section: 'other' };
+  return { key: `draft_${nextKey}`, name: '', amount: '', unit: '', section: 'other' };
 }
 
 export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'>) {
@@ -53,13 +75,6 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
     setIngredients((prev) => prev.filter((ing) => ing.key !== key));
   };
 
-  /** Tap-to-cycle keeps the section picker to one line per ingredient. */
-  const cycleSection = (key: string, current: StoreSection) => {
-    const index = STORE_SECTIONS.indexOf(current);
-    const next = STORE_SECTIONS[(index + 1) % STORE_SECTIONS.length];
-    updateIngredient(key, { section: next });
-  };
-
   const save = () => {
     const cleanTitle = title.trim();
     const filled = ingredients.filter((ing) => ing.name.trim().length > 0);
@@ -80,7 +95,7 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
       isUserCreated: true,
       ingredients: filled.map((ing) => ({
         name: ing.name,
-        quantity: ing.quantity,
+        quantity: composeQuantity(ing.amount, ing.unit),
         section: ing.section,
       })),
     });
@@ -143,32 +158,41 @@ export function AddRecipeScreen({ navigation }: RootStackScreenProps<'AddRecipe'
                 )}
               </View>
 
+              <TextInput
+                style={styles.input}
+                placeholder="Ingredient"
+                placeholderTextColor={colors.textMuted}
+                value={ing.name}
+                onChangeText={(text) => updateIngredient(ing.key, { name: text })}
+              />
+
               <View style={styles.ingredientInputs}>
                 <TextInput
-                  style={[styles.input, styles.flex]}
-                  placeholder="Ingredient"
-                  placeholderTextColor={colors.textMuted}
-                  value={ing.name}
-                  onChangeText={(text) => updateIngredient(ing.key, { name: text })}
-                />
-                <TextInput
-                  style={[styles.input, styles.quantityInput]}
+                  style={[styles.input, styles.amountInput]}
                   placeholder="Qty"
                   placeholderTextColor={colors.textMuted}
-                  value={ing.quantity}
-                  onChangeText={(text) => updateIngredient(ing.key, { quantity: text })}
+                  keyboardType={
+                    Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'
+                  }
+                  value={ing.amount}
+                  onChangeText={(text) => updateIngredient(ing.key, { amount: text })}
+                />
+                <Select
+                  label="Unit"
+                  value={ing.unit}
+                  options={UNIT_OPTIONS}
+                  triggerLabel={UNIT_SHORT_LABELS[ing.unit]}
+                  onChange={(unit) => updateIngredient(ing.key, { unit })}
+                  style={styles.unitSelect}
                 />
               </View>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Store section: ${SECTION_LABELS[ing.section]}. Tap to change.`}
-                onPress={() => cycleSection(ing.key, ing.section)}
-                style={({ pressed }) => [styles.sectionChip, pressed && styles.pressed]}>
-                <Text style={styles.sectionChipText}>
-                  {SECTION_LABELS[ing.section]} ▸
-                </Text>
-              </Pressable>
+              <Select
+                label="Store section"
+                value={ing.section}
+                options={SECTION_OPTIONS}
+                onChange={(section) => updateIngredient(ing.key, { section })}
+              />
             </View>
           ))}
 
@@ -236,18 +260,8 @@ const styles = StyleSheet.create({
   ingredientIndex: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   removeText: { fontSize: 12, fontWeight: '700', color: colors.danger },
   ingredientInputs: { flexDirection: 'row', gap: spacing.sm },
-  quantityInput: { width: 80 },
-  sectionChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.pill,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  sectionChipText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  pressed: { opacity: 0.7 },
+  amountInput: { width: 96 },
+  unitSelect: { flex: 1 },
   footer: {
     padding: spacing.lg,
     borderTopWidth: 1,
