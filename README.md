@@ -25,6 +25,10 @@ Two rules the code deliberately enforces:
 2. **The app never invents a status.** An item with no inventory row is
    *untracked*, which is different from `none`. `none` is a statement the user
    made; untracked means they never said.
+3. **An item is not inventory.** `items` is a catalog — every ingredient any
+   recipe mentions lands there. The Inventory screen lists only rows the user
+   put there, by adding them or by confirming "have it" at checkout. Untracked
+   items surface as *search suggestions*, never as inventory.
 
 ### Recipe → inventory pre-fill
 
@@ -52,6 +56,29 @@ Every pre-fill is a suggestion, overridable with a single tap.
 
 Quantities on the grocery list accumulate as text (`"2 cups; 1 tbsp"`) rather
 than being summed — units are free text and adding them would be a guess.
+Recipe quantities are *composed* from an amount plus a unit picked from a list,
+then stored as that same free text.
+
+### Stocking the inventory directly
+
+The Inventory screen's **Add** sheet searches two pools at once: items already
+in the database (recipe ingredients, past additions) and `data/foodCatalog.ts`,
+~420 common groceries. Catalog entries are never inserted on launch — a row is
+created the moment the user adds one, so nothing appears in the inventory that
+the user didn't ask for.
+
+The catalog is deliberately not exhaustive; three things cover the long tail:
+
+- **Token search.** Query words are matched against name words, so a near-miss
+  ("pumpkin gnocchi") surfaces something related rather than an empty list.
+  Partial hits are dropped whenever a real match exists.
+- **Create from the search box.** Anything not in either pool becomes an item by
+  name. `logic/sectionGuess.ts` guesses the aisle from keywords so it's one tap;
+  the specific rules run first, which is what keeps "baking powder" out of the
+  spice rack and "peanut butter" out of the dairy case. It answers `other` when
+  nothing matches rather than guessing wrong.
+- **Recipes feed the pool.** Any ingredient typed into a recipe is an item, and
+  therefore a suggestion from then on.
 
 ## Project layout
 
@@ -63,14 +90,18 @@ src/
   data/          # persistence — SQLite only, no React
     types.ts        domain types + labels
     db.ts           connection, schema, migrations
-    itemRepo.ts     canonical items + name normalization
+    itemRepo.ts     canonical items
     inventoryRepo.ts
     recipeRepo.ts
     groceryRepo.ts
     seed.ts         8 starter recipes, inserted once
+    foodCatalog.ts  common groceries offered as search suggestions
   logic/         # pure functions — no React, no SQLite
     matching.ts     pre-fill rules, checkout plan, match summary
-    format.ts       relative dates, aisle grouping
+    itemSearch.ts   catalog + known-item search for "add to inventory"
+    sectionGuess.ts keyword aisle guess for items the catalog lacks
+    normalize.ts    name normalization shared by the repo and search
+    format.ts       relative dates, aisle grouping, quantity composition
     rules.check.ts  assertions covering the rules above
   state/
     store.ts        Zustand; SQLite is the source of truth, this is a

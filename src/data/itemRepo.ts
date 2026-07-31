@@ -1,5 +1,8 @@
+import { normalizeName } from '../logic/normalize';
 import { getDb, uid } from './db';
 import type { Item, StoreSection } from './types';
+
+export { normalizeName };
 
 interface ItemRow {
   id: string;
@@ -15,19 +18,6 @@ function toItem(row: ItemRow): Item {
     normalizedName: row.normalized_name,
     section: row.section as StoreSection,
   };
-}
-
-/**
- * Collapses "  Olive Oil " and "olive oil" to the same key so recipes written
- * at different times still point at one inventory row. Also strips a trailing
- * plural "s" so "eggs"/"egg" match.
- */
-export function normalizeName(raw: string): string {
-  const base = raw.trim().toLowerCase().replace(/\s+/g, ' ');
-  if (base.length > 3 && base.endsWith('s') && !base.endsWith('ss')) {
-    return base.slice(0, -1);
-  }
-  return base;
 }
 
 export function listItems(): Item[] {

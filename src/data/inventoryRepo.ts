@@ -38,8 +38,9 @@ function toInventoryRow(row: JoinedRow): InventoryRow {
 }
 
 /**
- * Every item the user has ever given a status, newest change first.
- * Items never touched are excluded — see `listAllItemsWithStatus` for those.
+ * The user's inventory: every item they have given a status, newest change
+ * first. Items that merely exist because a recipe mentions them are excluded —
+ * they are search suggestions, not inventory.
  */
 export function listInventory(): InventoryRow[] {
   return getDb()
@@ -49,19 +50,6 @@ export function listInventory(): InventoryRow[] {
        FROM items i
        JOIN inventory inv ON inv.item_id = i.id
        ORDER BY inv.last_updated DESC`
-    )
-    .map(toInventoryRow);
-}
-
-/** Every known item, including untracked ones (entry === null). */
-export function listAllItemsWithStatus(): InventoryRow[] {
-  return getDb()
-    .getAllSync<JoinedRow>(
-      `SELECT i.id, i.name, i.normalized_name, i.section,
-              inv.status, inv.last_updated, inv.source
-       FROM items i
-       LEFT JOIN inventory inv ON inv.item_id = i.id
-       ORDER BY i.name COLLATE NOCASE`
     )
     .map(toInventoryRow);
 }

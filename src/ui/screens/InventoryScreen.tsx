@@ -1,30 +1,26 @@
 import { useMemo, useState } from 'react';
-import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { STATUS_LABELS, type InventoryRow, type ItemStatus } from '../../data/types';
+import {
+  SECTION_LABELS,
+  STATUS_LABELS,
+  type InventoryRow,
+  type ItemStatus,
+} from '../../data/types';
 import { relativeDate } from '../../logic/format';
 import { useAppStore } from '../../state/store';
+import { AddItemSheet } from '../components/AddItemSheet';
 import { EmptyState } from '../components/common';
 import { colors, radius, spacing, statusColors } from '../theme';
 
-type Filter = 'all' | ItemStatus | 'untracked';
+type Filter = 'all' | ItemStatus;
 
 const FILTERS: Array<{ key: Filter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'full', label: 'Full' },
   { key: 'some', label: 'Some' },
   { key: 'none', label: 'None' },
-  { key: 'untracked', label: 'Not set' },
 ];
 
 const STATUS_OPTIONS: ItemStatus[] = ['full', 'some', 'none'];
@@ -33,28 +29,32 @@ export function InventoryScreen() {
   const inventory = useAppStore((s) => s.inventory);
   const setItemStatus = useAppStore((s) => s.setItemStatus);
   const addManualItem = useAppStore((s) => s.addManualItem);
+  const clearItemStatus = useAppStore((s) => s.clearItemStatus);
+  const listKnownItems = useAppStore((s) => s.listKnownItems);
 
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
-  const [draftName, setDraftName] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  // Re-read on open, and after each add, so items created by a recipe — or by
+  // the sheet itself a second ago — show up as suggestions.
+  const knownItems = useMemo(
+    () => (adding ? listKnownItems() : []),
+    [adding, inventory, listKnownItems]
+  );
+
+  const trackedNames = useMemo(
+    () => new Set(inventory.map((row) => row.item.normalizedName)),
+    [inventory]
+  );
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    const filtered = inventory.filter((row) => {
+    return inventory.filter((row) => {
       if (query && !row.item.name.toLowerCase().includes(query)) return false;
       if (filter === 'all') return true;
-      if (filter === 'untracked') return row.entry === null;
       return row.entry?.status === filter;
-    });
-
-    // Tracked items first, most recently touched at the top; untracked items
-    // sink to the bottom alphabetically.
-    return [...filtered].sort((a, b) => {
-      if (a.entry && b.entry) return b.entry.lastUpdated.localeCompare(a.entry.lastUpdated);
-      if (a.entry) return -1;
-      if (b.entry) return 1;
-      return a.item.name.localeCompare(b.item.name);
     });
   }, [inventory, filter, search]);
 
@@ -70,90 +70,100 @@ export function InventoryScreen() {
     return { full, some, none };
   }, [inventory]);
 
-  const submitDraft = () => {
-    const name = draftName.trim();
-    if (!name) return;
-    addManualItem(name, 'full', 'other');
-    setDraftName('');
+  const confirmRemove = (row: InventoryRow) => {
+    Alert.alert(
+      'Remove from inventory?',
+      `"${row.item.name}" will stop being tracked. Recipes that use it will treat it as unknown again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => clearItemStatus(row.item.id),
+        },
+      ]
+    );
   };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Inventory</Text>
-          <Text style={styles.subtitle}>
-            {counts.full} full · {counts.some} some · {counts.none} none
-          </Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.title}>Inventory</Text>
+        <Text style={styles.subtitle}>
+          {counts.full} full · {counts.some} some · {counts.none} none
+        </Text>
+      </View>
 
-        <View style={styles.addRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="Add an item you have"
-            placeholderTextColor={colors.textMuted}
-            value={draftName}
-            onChangeText={setDraftName}
-            returnKeyType="done"
-            onSubmitEditing={submitDraft}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add item"
-            onPress={submitDraft}
-            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
-            <Text style={styles.addButtonText}>Add</Text>
-          </Pressable>
-        </View>
-
+      <View style={styles.addRow}>
         <TextInput
-          style={[styles.input, styles.search]}
-          placeholder="Search items"
+          style={styles.input}
+          placeholder="Search your inventory"
           placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
         />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add items to inventory"
+          onPress={() => setAdding(true)}
+          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
+          <Text style={styles.addButtonText}>+ Add</Text>
+        </Pressable>
+      </View>
 
-        <View style={styles.filterRow}>
-          {FILTERS.map((f) => {
-            const active = filter === f.key;
-            return (
-              <Pressable
-                key={f.key}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => setFilter(f.key)}
-                style={[styles.filterChip, active && styles.filterChipOn]}>
-                <Text style={[styles.filterText, active && styles.filterTextOn]}>
-                  {f.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      <View style={styles.filterRow}>
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <Pressable
+              key={f.key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onPress={() => setFilter(f.key)}
+              style={[styles.filterChip, active && styles.filterChipOn]}>
+              <Text style={[styles.filterText, active && styles.filterTextOn]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
-        <FlatList
-          data={rows}
-          keyExtractor={(row) => row.item.id}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
+      <FlatList
+        data={rows}
+        keyExtractor={(row) => row.item.id}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          inventory.length === 0 ? (
             <EmptyState
-              title="Nothing here"
-              body="Items show up once they appear in a recipe or you add them yourself."
+              title="Your inventory is empty"
+              body="Tap Add to search for food you already have at home. Marking ingredients “have it” during a recipe adds them here too."
             />
-          }
-          renderItem={({ item: row }) => (
-            <InventoryItemRow
-              row={row}
-              onSetStatus={(status) => setItemStatus(row.item.id, status)}
+          ) : (
+            <EmptyState
+              title="Nothing matches"
+              body="No item in your inventory fits that search or filter."
             />
-          )}
-        />
-      </KeyboardAvoidingView>
+          )
+        }
+        renderItem={({ item: row }) => (
+          <InventoryItemRow
+            row={row}
+            onSetStatus={(status) => setItemStatus(row.item.id, status)}
+            onRemove={() => confirmRemove(row)}
+          />
+        )}
+      />
+
+      <AddItemSheet
+        visible={adding}
+        onClose={() => setAdding(false)}
+        knownItems={knownItems}
+        trackedNames={trackedNames}
+        onAdd={(name, section) => addManualItem(name, 'full', section)}
+      />
     </SafeAreaView>
   );
 }
@@ -161,17 +171,30 @@ export function InventoryScreen() {
 function InventoryItemRow({
   row,
   onSetStatus,
+  onRemove,
 }: {
   row: InventoryRow;
   onSetStatus: (status: ItemStatus) => void;
+  onRemove: () => void;
 }) {
   const current = row.entry?.status ?? null;
 
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
-        <Text style={styles.itemName}>{row.item.name}</Text>
-        <Text style={styles.itemDate}>{relativeDate(row.entry?.lastUpdated ?? null)}</Text>
+        <View style={styles.cardText}>
+          <Text style={styles.itemName}>{row.item.name}</Text>
+          <Text style={styles.itemMeta}>
+            {SECTION_LABELS[row.item.section]} · {relativeDate(row.entry?.lastUpdated ?? null)}
+          </Text>
+        </View>
+        <Pressable
+          onPress={onRemove}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${row.item.name} from inventory`}>
+          <Text style={styles.removeText}>Remove</Text>
+        </Pressable>
       </View>
 
       <View style={styles.statusRow}>
@@ -209,7 +232,6 @@ function InventoryItemRow({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  flex: { flex: 1 },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.xs },
   title: { fontSize: 30, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
@@ -230,7 +252,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     flex: 1,
   },
-  search: { marginHorizontal: spacing.lg, marginTop: spacing.sm, flex: 0 },
   addButton: {
     backgroundColor: colors.accent,
     borderRadius: radius.sm,
@@ -267,12 +288,14 @@ const styles = StyleSheet.create({
   },
   cardTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  itemName: { fontSize: 16, fontWeight: '700', color: colors.text, flexShrink: 1 },
-  itemDate: { fontSize: 12, color: colors.textMuted },
+  cardText: { flexShrink: 1, gap: 2 },
+  itemName: { fontSize: 16, fontWeight: '700', color: colors.text },
+  itemMeta: { fontSize: 12, color: colors.textMuted },
+  removeText: { fontSize: 12, fontWeight: '700', color: colors.danger },
   statusRow: { flexDirection: 'row', gap: spacing.sm },
   statusOption: {
     flex: 1,

@@ -10,6 +10,7 @@ import type {
   GroceryRow,
   InventoryEntry,
   InventoryRow,
+  Item,
   ItemStatus,
   Recipe,
   RecipeWithIngredients,
@@ -38,6 +39,8 @@ interface AppState {
   refreshGrocery: () => void;
 
   getRecipe: (id: string) => RecipeWithIngredients | null;
+  /** Every item the app knows of, tracked or not — the pool "add item" searches. */
+  listKnownItems: () => Item[];
   createRecipe: (input: recipeRepo.NewRecipeInput) => string;
   deleteRecipe: (id: string) => void;
 
@@ -83,9 +86,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshRecipes: () => set({ recipes: recipeRepo.listRecipes() }),
 
   refreshInventory: () => {
-    // Includes untracked items so the Inventory screen can offer them for a
-    // first-time status set.
-    const rows = inventoryRepo.listAllItemsWithStatus();
+    // Only items the user has actually put in their inventory — by adding them
+    // here or by confirming "have it" at recipe checkout. Items that merely
+    // exist because some recipe mentions them are not inventory.
+    const rows = inventoryRepo.listInventory();
     set({ inventory: rows, statusMap: buildStatusMap(rows) });
   },
 
@@ -93,11 +97,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   getRecipe: (id) => recipeRepo.getRecipe(id),
 
+  listKnownItems: () => itemRepo.listItems(),
+
   createRecipe: (input) => {
     const id = recipeRepo.createRecipe(input);
     get().refreshRecipes();
-    // New ingredients may have created new items.
-    get().refreshInventory();
+    // New ingredients may create new items, but an item is not inventory until
+    // the user gives it a status — so there is nothing to refresh here.
     return id;
   },
 
@@ -148,7 +154,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const item = itemRepo.findOrCreateItem(name, section);
     groceryRepo.addToGrocery(item.id, quantity, null);
     get().refreshGrocery();
-    get().refreshInventory();
   },
 
   resetEverything: () => {
