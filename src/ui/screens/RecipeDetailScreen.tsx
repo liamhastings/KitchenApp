@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { IngredientChoice } from '../../data/types';
+import { hostOf } from '../../logic/browserUrl';
 import { relativeDate } from '../../logic/format';
 import { buildIngredientLines, type IngredientLine } from '../../logic/matching';
 import type { RootStackScreenProps } from '../../navigation/types';
@@ -79,6 +80,17 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
           </Text>
         </View>
 
+        {!!recipe.sourceUrl && (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => navigation.navigate('Browser', { url: recipe.sourceUrl })}
+            hitSlop={4}>
+            <Text style={styles.sourceLink}>
+              Method and full instructions at {hostOf(recipe.sourceUrl) || 'the source'} ↗
+            </Text>
+          </Pressable>
+        )}
+
         <View style={styles.bulkRow}>
           <Text style={styles.bulkLabel}>Mark all</Text>
           <Pressable onPress={() => setAll('have')} hitSlop={8}>
@@ -139,6 +151,7 @@ const styles = StyleSheet.create({
   description: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
   metaRow: { flexDirection: 'row', gap: spacing.lg },
   meta: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
+  sourceLink: { fontSize: 13, fontWeight: '600', color: colors.accent },
   bulkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   bulkLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
   bulkAction: { fontSize: 13, fontWeight: '700' },

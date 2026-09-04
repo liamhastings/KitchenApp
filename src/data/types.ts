@@ -172,6 +172,8 @@ export interface Recipe {
   servings: string;
   isUserCreated: boolean;
   createdAt: string;
+  /** Page this was imported from. Empty for typed and seeded recipes. */
+  sourceUrl: string;
 }
 
 /** A recipe with its ingredients resolved to canonical items. */

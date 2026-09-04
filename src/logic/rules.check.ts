@@ -1,9 +1,22 @@
 import assert from 'node:assert';
 
 import { FOOD_CATALOG } from '../data/foodCatalog';
+import { hostOf, toBrowserUrl } from './browserUrl';
 import type { Item, InventoryEntry, ItemStatus, RecipeWithIngredients } from '../data/types';
 import { findExactMatch, searchFoods } from './itemSearch';
 import { normalizeName } from './normalize';
+import { parseJsonLdRecipe, splitIngredientText, toImportDraft } from './recipeExtract';
+import {
+  BROKEN_THEN_VALID,
+  CLEAN_JSON_LD,
+  GRAPH_JSON_LD,
+  NO_RECIPE,
+} from './recipeExtract.fixtures';
+import {
+  buildExtractionPrompt,
+  extractRecipeWithClaude,
+  parseLlmRecipeJson,
+} from './recipeExtractLlm';
 import { guessSection } from './sectionGuess';
 import {
   buildCheckoutPlan,
@@ -38,6 +51,7 @@ const recipe: RecipeWithIngredients = {
   servings: '2',
   isUserCreated: false,
   createdAt: new Date().toISOString(),
+  sourceUrl: '',
   ingredients: [
     { id: 'i1', recipeId: 'r1', itemId: 'eggs', quantity: '3', sortOrder: 0, item: { id: 'eggs', name: 'Eggs', normalizedName: 'egg', section: 'dairy' } },
     { id: 'i2', recipeId: 'r1', itemId: 'rice', quantity: '1 cup', sortOrder: 1, item: { id: 'rice', name: 'Rice', normalizedName: 'rice', section: 'pantry' } },
@@ -231,4 +245,196 @@ assert.equal(guessSection('black pepper'), 'spices', 'not every pepper is produc
 assert.equal(guessSection('sourdough loaf'), 'bakery');
 assert.equal(guessSection(''), 'other');
 
-console.log('All logic assertions passed.');
+// --- recipe import: JSON-LD extraction --------------------------------------
+const chili = parseJsonLdRecipe(CLEAN_JSON_LD, 'https://example.com/chili');
+assert.ok(chili, 'a plain schema.org Recipe is found');
+assert.equal(chili!.title, 'Weeknight Chili & Cornbread', 'entities are decoded');
+assert.equal(chili!.servings, '6 servings');
+assert.equal(chili!.sourceUrl, 'https://example.com/chili', 'the page URL rides along');
+assert.equal(chili!.ingredients.length, 6, 'every ingredient line survives');
+assert.equal(chili!.ingredients[0].text, '1 lb ground beef', 'lines are kept verbatim');
+assert.deepEqual(chili!.steps, ['Brown the beef.', 'Add everything else and simmer.']);
+
+const soup = parseJsonLdRecipe(GRAPH_JSON_LD, 'https://example.com/soup');
+assert.ok(soup, 'a Recipe nested in @graph is found past the other nodes');
+assert.equal(soup!.title, 'Lemon Orzo Soup');
+assert.equal(soup!.servings, '4', 'an array yield takes the first value');
+assert.deepEqual(
+  soup!.steps,
+  ['Bring the broth to a boil.', 'Add orzo and cook 8 minutes.'],
+  'HowToSection nesting is flattened'
+);
+
+assert.equal(parseJsonLdRecipe(NO_RECIPE, 'https://example.com/pans'), null, 'no Recipe -> null');
+assert.equal(parseJsonLdRecipe('<html><body>hi</body></html>'), null, 'no JSON-LD at all -> null');
+assert.equal(
+  parseJsonLdRecipe('<script type="application/ld+json">{"@type":"Recipe","name":"X"}</script>'),
+  null,
+  'a Recipe with no ingredients is not worth saving'
+);
+assert.equal(
+  parseJsonLdRecipe(BROKEN_THEN_VALID)?.title,
+  'Toast',
+  'one unparseable block does not hide a valid one'
+);
+
+// --- recipe import: ingredient line -> item name + quantity -----------------
+assert.deepEqual(splitIngredientText('2 cups all-purpose flour, sifted'), {
+  name: 'All-purpose flour',
+  quantity: '2 cups',
+});
+assert.deepEqual(splitIngredientText('1 lb ground beef'), {
+  name: 'Ground beef',
+  quantity: '1 lb',
+});
+assert.deepEqual(splitIngredientText('½ teaspoon cumin'), {
+  name: 'Cumin',
+  quantity: '1/2 teaspoon',
+});
+assert.deepEqual(splitIngredientText('1½ cups milk'), {
+  name: 'Milk',
+  quantity: '1 1/2 cups',
+});
+assert.deepEqual(splitIngredientText('2 (14-ounce) cans diced tomatoes'), {
+  name: 'Diced tomatoes',
+  quantity: '2 cans',
+});
+assert.deepEqual(
+  splitIngredientText('1 large yellow onion, finely chopped'),
+  { name: 'Yellow onion', quantity: '1' },
+  'size words are dropped so the catalog does not fork into large/small onions'
+);
+assert.deepEqual(splitIngredientText('Salt and pepper to taste'), {
+  name: 'Salt and pepper',
+  quantity: '',
+});
+assert.deepEqual(
+  splitIngredientText('Pinch of saffron'),
+  { name: 'Saffron', quantity: 'Pinch' },
+  'a bare unit still reads as a quantity when the line says "of"'
+);
+assert.deepEqual(
+  splitIngredientText('Cornstarch'),
+  { name: 'Cornstarch', quantity: '' },
+  'an unquantified line is all name, like a typed ingredient with no amount'
+);
+
+// --- recipe import: the draft matches what recipeRepo already accepts -------
+const draft = toImportDraft(chili!);
+assert.equal(draft.isUserCreated, true, 'imports are the user’s recipes, like typed ones');
+assert.equal(draft.title, 'Weeknight Chili & Cornbread');
+assert.equal(draft.servings, '6 servings');
+assert.deepEqual(
+  draft.ingredients.map((i) => [i.name, i.quantity, i.section]),
+  [
+    ['Ground beef', '1 lb', 'meat_seafood'],
+    ['Canned tomatoes', '2 cups', 'pantry'],
+    ['Yellow onion', '1', 'produce'],
+    ['Garlic', '2 cloves', 'produce'],
+    ['Cumin', '1/2 teaspoon', 'spices'],
+    ['Salt and pepper', '', 'spices'],
+  ],
+  'imported lines land as name/quantity/section, aisle-guessed like typed items'
+);
+assert.ok(
+  draft.ingredients.every((i) => typeof i.name === 'string' && typeof i.quantity === 'string'),
+  'the draft is structurally a NewRecipeInput — no new write path needed'
+);
+
+// --- browser address bar: URL or search? ------------------------------------
+assert.equal(toBrowserUrl('https://example.com/x'), 'https://example.com/x');
+assert.equal(toBrowserUrl('seriouseats.com/chili'), 'https://seriouseats.com/chili');
+assert.equal(
+  toBrowserUrl('chicken pot pie'),
+  'https://duckduckgo.com/?q=chicken%20pot%20pie',
+  'a phrase is a search, not a hostname'
+);
+assert.equal(toBrowserUrl('  '), '', 'empty input navigates nowhere');
+assert.equal(hostOf('https://www.seriouseats.com/chili'), 'seriouseats.com', 'www is dropped');
+assert.equal(hostOf('not a url'), '');
+
+// --- recipe import: the model fallback's pure halves ------------------------
+const llmPrompt = buildExtractionPrompt('Grandma soup\n2 carrots', 'https://example.com/soup');
+assert.ok(llmPrompt.includes('https://example.com/soup'), 'the prompt carries the page URL');
+assert.ok(llmPrompt.includes('2 carrots'), 'the prompt carries the page text');
+
+const fenced = parseLlmRecipeJson(
+  '```json\n{"title":"Toast","ingredients":[{"text":"2 slices bread"}],"steps":["Toast it."]}\n```',
+  'https://example.com/toast'
+);
+assert.equal(fenced?.title, 'Toast', 'a fenced reply is still read');
+assert.equal(fenced?.ingredients[0].text, '2 slices bread');
+assert.equal(fenced?.sourceUrl, 'https://example.com/toast');
+
+assert.equal(
+  parseLlmRecipeJson('Sure! {"title":"Tea","ingredients":["1 bag tea"]}', 'u')?.ingredients[0].text,
+  '1 bag tea',
+  'plain-string ingredients and surrounding prose are both tolerated'
+);
+assert.equal(parseLlmRecipeJson('{"title": ""}', 'u'), null, 'the not-a-recipe reply fails closed');
+assert.equal(parseLlmRecipeJson('no json here', 'u'), null, 'garbage fails closed');
+assert.equal(
+  parseLlmRecipeJson('{"title":"X","ingredients":[]}', 'u'),
+  null,
+  'a titled recipe with no ingredients is still not importable'
+);
+
+/** Stands in for fetch so the request path runs without a network. */
+function fakeFetch(status: number, body: unknown): typeof fetch {
+  return (async () =>
+    ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+    }) as unknown as Response) as unknown as typeof fetch;
+}
+
+async function checkLlmFallback(): Promise<void> {
+  const good = await extractRecipeWithClaude('page text', 'https://example.com/x', {
+    apiKey: 'test-key',
+    fetchImpl: fakeFetch(200, {
+      stop_reason: 'end_turn',
+      content: [
+        { type: 'text', text: '{"title":"Dal","ingredients":["1 cup red lentils"],"steps":[]}' },
+      ],
+    }),
+  });
+  assert.ok(good.ok && good.recipe.title === 'Dal', 'a good reply becomes a recipe');
+
+  const noKey = await extractRecipeWithClaude('t', 'u', { apiKey: '' });
+  assert.deepEqual(noKey, { ok: false, reason: 'no_api_key' }, 'no key is a reason, not a crash');
+
+  const http500 = await extractRecipeWithClaude('t', 'u', {
+    apiKey: 'k',
+    fetchImpl: fakeFetch(500, {}),
+  });
+  assert.deepEqual(http500, { ok: false, reason: 'request_failed' });
+
+  const refused = await extractRecipeWithClaude('t', 'u', {
+    apiKey: 'k',
+    fetchImpl: fakeFetch(200, { stop_reason: 'refusal', content: [] }),
+  });
+  assert.deepEqual(refused, { ok: false, reason: 'refused' }, 'a refusal never reaches content');
+
+  const junk = await extractRecipeWithClaude('t', 'u', {
+    apiKey: 'k',
+    fetchImpl: fakeFetch(200, { stop_reason: 'end_turn', content: [{ type: 'text', text: 'hi!' }] }),
+  });
+  assert.deepEqual(junk, { ok: false, reason: 'unreadable' }, 'a non-JSON reply is never saved');
+
+  const threw = await extractRecipeWithClaude('t', 'u', {
+    apiKey: 'k',
+    fetchImpl: (() => {
+      throw new Error('offline');
+    }) as unknown as typeof fetch,
+  });
+  assert.deepEqual(threw, { ok: false, reason: 'request_failed' }, 'a thrown fetch is handled');
+}
+
+checkLlmFallback().then(
+  () => console.log('All logic assertions passed.'),
+  (error) => {
+    console.error(error);
+    process.exit(1);
+  }
+);

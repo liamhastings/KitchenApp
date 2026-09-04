@@ -9,6 +9,7 @@ interface RecipeRow {
   servings: string;
   is_user_created: number;
   created_at: string;
+  source_url: string | null;
 }
 
 interface IngredientJoinRow {
@@ -30,6 +31,7 @@ function toRecipe(row: RecipeRow): Recipe {
     servings: row.servings,
     isUserCreated: row.is_user_created === 1,
     createdAt: row.created_at,
+    sourceUrl: row.source_url ?? '',
   };
 }
 
@@ -76,6 +78,8 @@ export interface NewRecipeInput {
   description?: string;
   servings?: string;
   isUserCreated?: boolean;
+  /** Set only by web import; typed and seeded recipes leave it empty. */
+  sourceUrl?: string;
   ingredients: Array<{ name: string; quantity?: string; section?: StoreSection }>;
 }
 
@@ -90,8 +94,8 @@ export function createRecipe(input: NewRecipeInput): string {
 
   db.withTransactionSync(() => {
     db.runSync(
-      `INSERT INTO recipes (id, title, description, servings, is_user_created, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO recipes (id, title, description, servings, is_user_created, created_at, source_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         recipeId,
         input.title.trim(),
@@ -99,6 +103,7 @@ export function createRecipe(input: NewRecipeInput): string {
         input.servings?.trim() ?? '',
         input.isUserCreated === false ? 0 : 1,
         now,
+        input.sourceUrl?.trim() ?? '',
       ]
     );
 
@@ -132,6 +137,17 @@ export function getAllRecipeItemIds(): Map<string, string[]> {
     else map.set(row.recipe_id, [row.item_id]);
   }
   return map;
+}
+
+/** Lets import warn about a page the user has already saved. */
+export function findRecipeBySourceUrl(sourceUrl: string): Recipe | null {
+  const url = sourceUrl.trim();
+  if (!url) return null;
+  const row = getDb().getFirstSync<RecipeRow>(
+    'SELECT * FROM recipes WHERE source_url = ? LIMIT 1',
+    [url]
+  );
+  return row ? toRecipe(row) : null;
 }
 
 export function deleteRecipe(id: string): void {

@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { RootStackParamList, TabParamList } from './src/navigation/types';
 import { useAppStore } from './src/state/store';
 import { AddRecipeScreen } from './src/ui/screens/AddRecipeScreen';
+import { BrowserScreen } from './src/ui/screens/BrowserScreen';
 import { CheckoutScreen } from './src/ui/screens/CheckoutScreen';
 import { GroceryScreen } from './src/ui/screens/GroceryScreen';
 import { InventoryScreen } from './src/ui/screens/InventoryScreen';
@@ -102,6 +103,11 @@ export default function App() {
             name="AddRecipe"
             component={AddRecipeScreen}
             options={{ title: 'New Recipe', presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="Browser"
+            component={BrowserScreen}
+            options={{ title: 'Find a recipe', presentation: 'modal' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

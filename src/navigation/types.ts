@@ -15,6 +15,8 @@ export type RootStackParamList = {
   /** `lines` carries the user's have/need taps forward to the confirm step. */
   Checkout: { recipeId: string; lines: IngredientLine[] };
   AddRecipe: undefined;
+  /** `url` opens the browser straight at a page, e.g. a recipe's source. */
+  Browser: { url?: string } | undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

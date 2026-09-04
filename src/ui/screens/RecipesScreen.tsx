@@ -48,12 +48,18 @@ export function RecipesScreen() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <Button
-            title="+ Add your own recipe"
-            variant="secondary"
-            onPress={() => navigation.navigate('AddRecipe')}
-            style={styles.addButton}
-          />
+          <View style={styles.headerActions}>
+            <Button
+              title="+ Add your own recipe"
+              variant="secondary"
+              onPress={() => navigation.navigate('AddRecipe')}
+            />
+            <Button
+              title="Find a recipe online"
+              variant="secondary"
+              onPress={() => navigation.navigate('Browser')}
+            />
+          </View>
         }
         ListEmptyComponent={
           <EmptyState
@@ -131,7 +137,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 30, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
   listContent: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
-  addButton: { marginBottom: spacing.xs },
+  headerActions: { gap: spacing.sm, marginBottom: spacing.xs },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.md,

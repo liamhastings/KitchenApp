@@ -80,6 +80,50 @@ The catalog is deliberately not exhaustive; three things cover the long tail:
 - **Recipes feed the pool.** Any ingredient typed into a recipe is an item, and
   therefore a suggestion from then on.
 
+### Importing a recipe from the web
+
+The Recipes screen opens an in-app browser (`react-native-webview`). On **Import
+this recipe**, injected JavaScript posts the page's JSON-LD blocks and visible
+text back over the WebView bridge — read from inside the page rather than
+re-fetched, so JS-rendered markup and the user's own session are both visible.
+
+Extraction runs in two tiers, both landing on the same `ExtractedRecipe`:
+
+1. `parseJsonLdRecipe` reads schema.org `Recipe` markup (directly, in an array,
+   in `@graph`, or under `mainEntity`). Most recipe sites publish it for Google,
+   so this is the common path — exact, free, and offline.
+2. If there is none and an API key is configured, `extractRecipeWithClaude`
+   sends the page's visible text to the Claude API and asks for that same shape
+   back as JSON. Network, refusal, and parse failures all surface as "could not
+   read this recipe" — a half-parsed import is never saved.
+
+`toImportDraft` then splits each ingredient line into the *item name* and the
+*quantity* the rest of the app expects (`"2 cups all-purpose flour, sifted"` ->
+`All-purpose flour` + `2 cups`), guesses each aisle with `sectionGuess`, and
+hands the result to `recipeRepo.createRecipe` — the same call the Add Recipe
+form makes. Imported recipes are `is_user_created = 1` and carry a `source_url`;
+nothing downstream of the write can tell them apart from typed ones.
+
+Two consequences worth knowing:
+
+- **Instructions are not stored.** The schema has no steps column and this
+  feature did not add one. Steps are extracted (and counted in the import
+  confirmation) but only the ingredients are saved; the recipe detail links back
+  to the source page for the method.
+- **`servings` never scales quantities.** Quantities are free text, so halving
+  "2 cups" reliably would need a real unit parser. The yield is stored and shown
+  as written.
+
+The Claude fallback is off unless `EXPO_PUBLIC_ANTHROPIC_API_KEY` is set:
+
+```bash
+EXPO_PUBLIC_ANTHROPIC_API_KEY=sk-ant-... npm start
+```
+
+`EXPO_PUBLIC_*` values are inlined into the JS bundle, so that key is readable
+by anyone who unpacks the app — fine for a local single-user build, not for a
+shipped one. JSON-LD import works with no key at all.
+
 ## Project layout
 
 The data model is fully separated from the views so the two halves can be
@@ -102,7 +146,12 @@ src/
     sectionGuess.ts keyword aisle guess for items the catalog lacks
     normalize.ts    name normalization shared by the repo and search
     format.ts       relative dates, aisle grouping, quantity composition
+    recipeExtract.ts        JSON-LD -> recipe, ingredient line -> name+quantity
+    recipeExtract.fixtures.ts  sample pages the assertions run against
+    recipeExtractLlm.ts     Claude fallback: prompt, reply parser, one request
+    browserUrl.ts   address bar input -> URL or search
     rules.check.ts  assertions covering the rules above
+  config.ts      # build-time env (the optional Claude API key)
   state/
     store.ts        Zustand; SQLite is the source of truth, this is a
                     read-through cache that refreshes after every write
@@ -146,7 +195,12 @@ npm run typecheck && npm run check:logic
 
 `check:logic` runs `src/logic/rules.check.ts` under plain Node — it asserts the
 pre-fill table, that `some` survives confirmation, that need-it doesn't silently
-write inventory, and that a years-old status still counts as on hand.
+write inventory, that a years-old status still counts as on hand, and that
+import reads the fixture pages, splits ingredient lines correctly, and fails
+closed on every bad model reply.
+
+The webview is a native module: after `npm install`, an iOS build needs
+`npx expo prebuild --platform ios` (or `pod install`) before `npm run ios`.
 
 ## Known environment issues on this machine
 
@@ -163,6 +217,10 @@ write inventory, and that a years-old status still counts as on hand.
 
 ## Out of scope for this MVP
 
-No auth, no accounts, no cloud sync, no backend. No AI/budgeting features, no
+No auth, no accounts, no cloud sync, no backend. No budgeting features, no
 store pricing or brand comparison, no barcode scanning or receipt OCR, no
 ingredient health scanning. Single local user, single device.
+
+Recipe import calls the Claude API directly from the device when a key is
+configured, and only for pages without recipe markup. That is the one network
+call in the app: there is still no backend, no account, and nothing synced.

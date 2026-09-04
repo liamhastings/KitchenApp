@@ -39,6 +39,8 @@ interface AppState {
   refreshGrocery: () => void;
 
   getRecipe: (id: string) => RecipeWithIngredients | null;
+  /** An already-saved import of the same page, so the browser can warn first. */
+  findRecipeBySourceUrl: (sourceUrl: string) => Recipe | null;
   /** Every item the app knows of, tracked or not — the pool "add item" searches. */
   listKnownItems: () => Item[];
   createRecipe: (input: recipeRepo.NewRecipeInput) => string;
@@ -96,6 +98,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshGrocery: () => set({ grocery: groceryRepo.listGrocery() }),
 
   getRecipe: (id) => recipeRepo.getRecipe(id),
+
+  findRecipeBySourceUrl: (sourceUrl) => recipeRepo.findRecipeBySourceUrl(sourceUrl),
 
   listKnownItems: () => itemRepo.listItems(),
 

@@ -74,6 +74,22 @@ export function migrate(): void {
       value TEXT NOT NULL
     );
   `);
+
+  // Added after the first release: where an imported recipe came from. Empty
+  // for typed and seeded recipes, which is why it can be added in place.
+  addColumnIfMissing('recipes', 'source_url', "TEXT NOT NULL DEFAULT ''");
+}
+
+/**
+ * `CREATE TABLE IF NOT EXISTS` does nothing for a database that already exists,
+ * so a new column has to be added explicitly. Only safe for columns with a
+ * default — SQLite cannot add a NOT NULL column without one.
+ */
+function addColumnIfMissing(table: string, column: string, definition: string): void {
+  const database = getDb();
+  const columns = database.getAllSync<{ name: string }>(`PRAGMA table_info(${table})`);
+  if (columns.some((c) => c.name === column)) return;
+  database.execSync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 /** Reads a value from the key/value `meta` table. */
