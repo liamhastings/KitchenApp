@@ -267,6 +267,23 @@ function expandFractions(text: string): string {
   return out;
 }
 
+/** Past three decimal places a number is float noise, not something a cook wrote. */
+const LONG_DECIMAL = /\d+\.\d{4,}/g;
+
+/**
+ * Sites that store amounts as numbers publish "1/3" as "1.3333333333333333".
+ * Rounds those to one decimal place ("1.3"), but leaves short, exact decimals
+ * like "0.125" untouched.
+ */
+function roundLongDecimals(amount: string): string {
+  return amount.replace(LONG_DECIMAL, (digits) => {
+    const value = Number(digits);
+    const rounded = Number(value.toFixed(1));
+    // Keep a tiny amount from collapsing to "0".
+    return String(rounded === 0 ? Number(value.toPrecision(1)) : rounded);
+  });
+}
+
 function tidyName(text: string): string {
   let name = text.split(',')[0];
 
@@ -298,8 +315,9 @@ export function splitIngredientText(raw: string): { name: string; quantity: stri
   if (!text) return { name: '', quantity: '' };
 
   const amountMatch = text.match(AMOUNT);
-  const amount = amountMatch ? amountMatch[0] : '';
-  let rest = text.slice(amount.length).trim();
+  const rawAmount = amountMatch ? amountMatch[0] : '';
+  const amount = roundLongDecimals(rawAmount);
+  let rest = text.slice(rawAmount.length).trim();
 
   let unit = '';
   const unitMatch = rest.match(/^([a-z]+)\.?(?=\s|$)/i);

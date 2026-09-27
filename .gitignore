@@ -52,3 +52,7 @@ ios/*.xcodeproj/xcuserdata/
 
 # local logic-check output
 .tmp-check/
+.tmp-check/
+TASK.md
+PROGRESS.md
+BLOCKED.md

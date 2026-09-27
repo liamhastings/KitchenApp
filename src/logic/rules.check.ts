@@ -295,6 +295,26 @@ assert.deepEqual(splitIngredientText('1½ cups milk'), {
   name: 'Milk',
   quantity: '1 1/2 cups',
 });
+assert.deepEqual(
+  splitIngredientText('1.3333333333333333 cups all-purpose flour'),
+  { name: 'All-purpose flour', quantity: '1.3 cups' },
+  'float noise from a site’s JSON-LD is rounded, not shown as a long decimal'
+);
+assert.deepEqual(
+  splitIngredientText('0.6666666666666666 cup sugar'),
+  { name: 'Sugar', quantity: '0.7 cup' },
+  'the rounding applies to amounts under one too'
+);
+assert.deepEqual(
+  splitIngredientText('1.33333-1.66667 cups stock'),
+  { name: 'Stock', quantity: '1.3-1.7 cups' },
+  'both ends of a range are rounded'
+);
+assert.deepEqual(
+  splitIngredientText('0.125 teaspoon salt'),
+  { name: 'Salt', quantity: '0.125 teaspoon' },
+  'a short, exact decimal is left exactly as the recipe wrote it'
+);
 assert.deepEqual(splitIngredientText('2 (14-ounce) cans diced tomatoes'), {
   name: 'Diced tomatoes',
   quantity: '2 cans',
