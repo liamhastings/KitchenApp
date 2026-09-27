@@ -29,7 +29,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "check:logic": "tsc src/logic/rules.check.ts --ignoreConfig --outDir .tmp-check --module commonjs --target es2020 --moduleResolution node --skipLibCheck --esModuleInterop --types node --ignoreDeprecations 6.0 && node .tmp-check/logic/rules.check.js && rm -rf .tmp-check"
+    "check:logic": "tsc src/logic/rules.check.ts --ignoreConfig --outDir .tmp-check --module commonjs --target es2020 --moduleResolution node --skipLibCheck --esModuleInterop --types node --ignoreDeprecations 6.0 && node .tmp-check/logic/rules.check.js && node -e \"require('fs').rmSync('.tmp-check',{recursive:true,force:true})\"",
+    "test": "npm run typecheck && npm run check:logic"
   },
   "private": true
 }
